@@ -26,15 +26,10 @@ GIGA_PAGE_TIMEOUT  = 90_000
 GIGA_WAIT_AFTER_MS = 5_000
 
 GIGA_SEEDS = [
-    {"model": "Champiro Touring A/S", "url": f"{GIGA_BASE_URL}/185-65-14/gt-radial-tires/champiro-touring-a-s/tirecode/B513"},
-    {"model": "Savero HT2",           "url": f"{GIGA_BASE_URL}/215-70-15/gt-radial-tires/savero-ht2/tirecode/B452"},
-    {"model": "Adventuro AT3",        "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/adventuro-at3/tirecode/AS087"},
-    {"model": "Champiro UHP AS",      "url": f"{GIGA_BASE_URL}/195-55-15/gt-radial-tires/champiro-uhp-as/tirecode/100A2006"},
-    {"model": "Maxmiler Pro",         "url": f"{GIGA_BASE_URL}/185-60-15/gt-radial-tires/maxmiler-pro/tirecode/B623"},
-    {"model": "Maxtour LX",           "url": f"{GIGA_BASE_URL}/235-45-18/gt-radial-tires/maxtour-lx/tirecode/AS122"},
-    {"model": "Maxclimate",           "url": f"{GIGA_BASE_URL}/225-40-18/gt-radial-tires/maxclimate/tirecode/100UA4532"},
-    {"model": "Adventuro HT",         "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/adventuro-ht/tirecode/100UA3630"},
-    {"model": "Adventuro ATX",        "url": f"{GIGA_BASE_URL}/235-70-16/gt-radial-tires/adventuro-atx/tirecode/100UA3723"},
+    {"model": "Maxtour LX",   "url": f"{GIGA_BASE_URL}/235-45-18/gt-radial-tires/maxtour-lx/tirecode/AS122"},
+    {"model": "Maxclimate",   "url": f"{GIGA_BASE_URL}/225-40-18/gt-radial-tires/maxclimate/tirecode/100UA4532"},
+    {"model": "Adventuro HT", "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/adventuro-ht/tirecode/100UA3630"},
+    {"model": "Adventuro ATX","url": f"{GIGA_BASE_URL}/235-70-16/gt-radial-tires/adventuro-atx/tirecode/100UA3723"},
 ]
 
 
@@ -195,15 +190,10 @@ PRIORITY_HEADERS = {
 }
 
 PRIORITY_SEEDS = [
-    {"model": "Champiro Touring AS", "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-touring-a-s/205-55r16-91h-43691"},
-    {"model": "Savero HT2",          "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/savero-ht2/275-55r20-111h-66171"},
-    {"model": "Adventuro AT3",       "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-at3/235-85r16-120-116s-e-10-ply-43734"},
-    {"model": "Maxmiler Pro",        "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxmiler-pro/235-85r16-120-116r-e-10-ply-8127"},
-    {"model": "Champiro UHP AS",     "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-uhp-a-s/215-55r17-94v-43619"},
-    {"model": "Maxtour LX",          "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxtour-lx/215-45r17-87v-7388"},
-    {"model": "Adventuro HT",        "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-ht/235-85r16-120-116s-e-10-ply-14309"},
-    {"model": "Maxclimate",          "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/gt-radial-maxclimate/225-40r18-92v-xl-173817"},
-    {"model": "Adventuro ATX",       "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-atx/235-75r15-108s-xl-19048"},
+    {"model": "Maxtour LX",   "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxtour-lx/215-45r17-87v-7388"},
+    {"model": "Maxclimate",   "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/gt-radial-maxclimate/225-40r18-92v-xl-173817"},
+    {"model": "Adventuro HT", "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-ht/235-85r16-120-116s-e-10-ply-14309"},
+    {"model": "Adventuro ATX","url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-atx/235-75r15-108s-xl-19048"},
 ]
 
 
