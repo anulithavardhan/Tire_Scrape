@@ -25,8 +25,8 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright nest_asyncio pandas aiohttp beautifulsoup4 lxml
-
+          pip install playwright nest_asyncio pandas aiohttp beautifulsoup4 lxml brotli
+      
       - name: Install Playwright browsers
         run: playwright install chromium --with-deps
 
