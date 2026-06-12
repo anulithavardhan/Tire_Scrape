@@ -281,7 +281,7 @@ async def priority_get_size_urls(page, seed):
     return deduped
 
 
-def priority_parse_next_data(html, fallback_size):
+def priority_parse_next_data(html, fallback_size, url=None):
     result = {
         "price_per_tire": None, "total_4_tires": None,
         "rating": None, "review_count": None,
@@ -294,8 +294,20 @@ def priority_parse_next_data(html, fallback_size):
         nd     = json.loads(m.group(1))
         apollo = nd["props"]["pageProps"]["apolloState"]
 
-        simple = next((v for k, v in apollo.items()
-                       if k.startswith("SimpleProduct:") and isinstance(v, dict) and "price_range" in v), None)
+        target_id = None
+        if url:
+            last_seg = url.rstrip("/").split("/")[-1]
+            id_match = re.search(r"-(\d+)$", last_seg)
+            if id_match:
+                target_id = int(id_match.group(1))
+
+        simple = None
+        for key, val in apollo.items():
+            if key.startswith("SimpleProduct:") and isinstance(val, dict) and "price_range" in val:
+                if target_id is None or val.get("id") == target_id:
+                    simple = val
+                    break
+
         config = next((v for k, v in apollo.items()
                        if k.startswith("ConfigurableProduct:") and isinstance(v, dict)), None)
 
@@ -359,7 +371,7 @@ async def priority_fetch_one(session, item, semaphore, run_date, index, total):
             try:
                 async with session.get(url, headers=PRIORITY_HEADERS, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                     if resp.status == 200:
-                        result.update(priority_parse_next_data(await resp.text(), size))
+                        result.update(priority_parse_next_data(await resp.text(), size, url=url))
                         break
                     elif resp.status == 429:
                         await asyncio.sleep(5 * attempt)
