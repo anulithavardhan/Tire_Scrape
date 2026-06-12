@@ -38,7 +38,8 @@ jobs:
           ls -la scraper || true
 
       - name: Run scraper
-        run: python scraper/combined_tire_scraper_actions.py
+        run: |
+          python -u scraper/combined_tire_scraper_actions.py
 
       - name: Upload CSV artifact
         if: always()
