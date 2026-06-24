@@ -2,7 +2,7 @@ name: Daily Tire Scraper
 
 on:
   schedule:
-    - cron: '30 9 * * 1-5'   # runs every day at 8:00 AM UTC
+    - cron: '30 9 * * 1-5'   # runs weekdays at 9:30 AM UTC / 5:30 AM Eastern during daylight savings
   workflow_dispatch:
 
 env:
@@ -40,6 +40,20 @@ jobs:
       - name: Run scraper
         run: |
           python -u scraper/combined_tire_scraper_actions.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run SimpleTire scraper
+        continue-on-error: true
+        run: |
+          node scraper/simpletire-scrape.js --default-gt-radial --format csv > simpletire_raw.csv
+
+      - name: Standardize final CSV
+        run: |
+          python -u scraper/standardize_tire_prices.py
 
       - name: Upload CSV artifact
         if: always()
