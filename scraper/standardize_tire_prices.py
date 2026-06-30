@@ -20,6 +20,18 @@ def clean_money(value):
         return None
 
 
+def normalize_bool(value):
+    if pd.isna(value):
+        return False
+
+    if isinstance(value, bool):
+        return value
+
+    text = str(value).strip().lower()
+
+    return text in ["true", "1", "yes", "y", "in stock"]
+
+
 def normalize_model(value):
     if pd.isna(value):
         return None
@@ -29,7 +41,6 @@ def normalize_model(value):
     replacements = {
         "gt radial maxtour lx": "Maxtour LX",
         "maxtour lx": "Maxtour LX",
-        "maxtour lx tire": "Maxtour LX",
 
         "gt radial maxclimate": "Maxclimate",
         "maxclimate": "Maxclimate",
@@ -37,11 +48,9 @@ def normalize_model(value):
 
         "gt radial adventuro ht": "Adventuro HT",
         "adventuro ht": "Adventuro HT",
-        "adventuro ht tire": "Adventuro HT",
 
         "gt radial adventuro atx": "Adventuro ATX",
         "adventuro atx": "Adventuro ATX",
-        "adventuro atx tire": "Adventuro ATX",
     }
 
     key = text.lower().replace("-", " ").replace("  ", " ").strip()
@@ -82,8 +91,12 @@ def standardize_existing_giga_priority(df):
 
     df["model"] = df["model"].apply(normalize_model)
     df["price_per_tire"] = df["price_per_tire"].apply(clean_money)
+    df["in_stock"] = df["in_stock"].apply(normalize_bool)
 
-    return df[["website", "model", "size", "price_per_tire", "url"]]
+    # Keep only in-stock Giga/Priority rows
+    df = df[df["in_stock"] == True]
+
+    return df[["website", "model", "size", "price_per_tire", "in_stock", "url"]]
 
 
 def standardize_simpletire(df):
@@ -93,7 +106,14 @@ def standardize_simpletire(df):
     df["model"] = df["productName"].apply(normalize_model)
     df["price_per_tire"] = df["price"].apply(clean_money)
 
-    return df[["website", "model", "size", "price_per_tire", "url"]]
+    # SimpleTire script does not currently return in_stock.
+    # So for now, treat rows with a valid price as available.
+    df["in_stock"] = df["price_per_tire"].notna()
+
+    # Keep only rows that appear available
+    df = df[df["in_stock"] == True]
+
+    return df[["website", "model", "size", "price_per_tire", "in_stock", "url"]]
 
 
 def main():
@@ -140,6 +160,7 @@ def main():
             "model",
             "size",
             "price_per_tire",
+            "in_stock",
             "url",
             "RAW SIZE",
             "DATE",
@@ -151,12 +172,12 @@ def main():
     final_df.to_csv(out_file, index=False)
 
     print(f"Saved standardized file: {out_file}")
-    print(f"Rows: {len(final_df)}")
+    print(f"Rows after keeping only in-stock rows: {len(final_df)}")
 
     missing_map = final_df[final_df["MAP"].isna()]
     if not missing_map.empty:
         print(f"Warning: {len(missing_map)} rows did not match MAP.")
-        print(missing_map[["website", "model", "size", "RAW SIZE"]].head(30).to_string(index=False))
+        print(missing_map[["website", "model", "size", "RAW SIZE"]].head(20).to_string(index=False))
 
 
 if __name__ == "__main__":
