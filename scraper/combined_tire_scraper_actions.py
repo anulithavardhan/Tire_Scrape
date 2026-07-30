@@ -15,6 +15,7 @@ import pandas as pd
 import aiohttp
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+from playwright_stealth import Stealth
 from urllib.parse import urljoin
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -26,10 +27,19 @@ GIGA_PAGE_TIMEOUT  = 90_000
 GIGA_WAIT_AFTER_MS = 5_000
 
 GIGA_SEEDS = [
-    {"model": "Maxtour LX",   "url": f"{GIGA_BASE_URL}/235-45-18/gt-radial-tires/maxtour-lx/tirecode/AS122"},
-    {"model": "Maxclimate",   "url": f"{GIGA_BASE_URL}/225-40-18/gt-radial-tires/maxclimate/tirecode/100UA4532"},
-    {"model": "Adventuro HT", "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/adventuro-ht/tirecode/100UA3630"},
-    {"model": "Adventuro ATX","url": f"{GIGA_BASE_URL}/235-70-16/gt-radial-tires/adventuro-atx/tirecode/100UA3723"},
+    {"model": "Maxtour LX",             "url": f"{GIGA_BASE_URL}/235-45-18/gt-radial-tires/maxtour-lx/tirecode/AS122"},
+    {"model": "Maxclimate",             "url": f"{GIGA_BASE_URL}/225-40-18/gt-radial-tires/maxclimate/tirecode/100UA4532"},
+    {"model": "Adventuro HT",           "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/adventuro-ht/tirecode/100UA3630"},
+    {"model": "Adventuro ATX",          "url": f"{GIGA_BASE_URL}/235-70-16/gt-radial-tires/adventuro-atx/tirecode/100UA3723"},
+    {"model": "Champiro SX2",           "url": f"{GIGA_BASE_URL}/225-45-17/gt-radial-tires/champiro-sx2/tirecode/B611"},
+    {"model": "Champiro HPY",           "url": f"{GIGA_BASE_URL}/255-35-18/gt-radial-tires/champiro-hpy/tirecode/B030"},
+    {"model": "Maxmiler Pro",           "url": f"{GIGA_BASE_URL}/185-60-15/gt-radial-tires/maxmiler-pro/tirecode/B623"},
+    {"model": "Champiro UHP A/S",       "url": f"{GIGA_BASE_URL}/195-55-15/gt-radial-tires/champiro-uhp-as/tirecode/100A2006"},
+    {"model": "Champiro Touring A/S",   "url": f"{GIGA_BASE_URL}/185-65-14/gt-radial-tires/champiro-touring-a-s/tirecode/B513"},
+    {"model": "Maxtour All Season",     "url": f"{GIGA_BASE_URL}/175-70-13/gt-radial-tires/maxtour-all-season/tirecode/AS065"},
+    {"model": "Savero HT2",             "url": f"{GIGA_BASE_URL}/215-70-15/gt-radial-tires/savero-ht2/tirecode/B452"},
+    {"model": "Adventuro AT3",          "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/adventuro-at3/tirecode/AS087"},
+    {"model": "Savero Komodo M/T Plus", "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/savero-komodo-m-t-plus/tirecode/A289"},
 ]
 
 
@@ -47,9 +57,16 @@ def giga_empty(run_date, model, size, in_stock, url, error):
 async def giga_safe_goto(page, url):
     for attempt in range(1, GIGA_MAX_RETRY + 1):
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=GIGA_PAGE_TIMEOUT)
-            await page.wait_for_selector("body", timeout=30_000)
-            await page.wait_for_timeout(GIGA_WAIT_AFTER_MS)
+            await page.goto(url, wait_until="networkidle", timeout=GIGA_PAGE_TIMEOUT)
+            await page.wait_for_function(
+                """() => {
+                    const price = document.querySelector(
+                        '.product-price--lg .product-price__current-price'
+                    );
+                    return price && price.innerText.trim().startsWith('$');
+                }""",
+                timeout=20_000,
+            )
             return True, ""
         except PlaywrightTimeout as e:
             if attempt < GIGA_MAX_RETRY:
@@ -138,6 +155,8 @@ async def run_giga(run_date):
             locale="en-US",
         )
         page = await ctx.new_page()
+        stealth = Stealth()
+        await stealth.apply_stealth_async(page)
 
         for seed in GIGA_SEEDS:
             model_name = seed["model"]
@@ -190,10 +209,19 @@ PRIORITY_HEADERS = {
 }
 
 PRIORITY_SEEDS = [
-    {"model": "Maxtour LX",   "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxtour-lx/215-45r17-87v-7388"},
-    {"model": "Maxclimate",   "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/gt-radial-maxclimate/225-40r18-92v-xl-173817"},
-    {"model": "Adventuro HT", "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-ht/235-85r16-120-116s-e-10-ply-14309"},
-    {"model": "Adventuro ATX","url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-atx/235-75r15-108s-xl-19048"},
+    {"model": "Maxtour LX",             "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxtour-lx/215-45r17-87v-7388"},
+    {"model": "Maxclimate",             "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/gt-radial-maxclimate/225-40r18-92v-xl-173817"},
+    {"model": "Adventuro HT",           "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-ht/235-85r16-120-116s-e-10-ply-14309"},
+    {"model": "Adventuro ATX",          "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-atx/235-75r15-108s-xl-19048"},
+    {"model": "Champiro SX2",           "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-sx2/235-45r17-94w-zr-11644"},
+    {"model": "Champiro HPY",           "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-hpy/225-40r19-93y-xl-zr-63955"},
+    {"model": "Champiro UHP A/S",       "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-uhp-a-s/215-55r17-94v-43619"},
+    {"model": "Maxmiler Pro",           "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxmiler-pro/245-75r16-120-116q-e-10-ply-3623"},
+    {"model": "Champiro Touring A/S",   "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-touring-a-s/205-55r16-91h-43691"},
+    {"model": "Maxtour All Season",     "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxtour-all-season/185-65r15-88t-52698"},
+    {"model": "Savero HT2",             "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/savero-ht2/275-55r20-111h-66171"},
+    {"model": "Adventuro AT3",          "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-at3/235-85r16-120-116s-e-10-ply-43734"},
+    {"model": "Savero Komodo M/T Plus", "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/savero-komodo-m-t-plus/235-75r15-104-101q-c-6-ply-53015"},
 ]
 
 
