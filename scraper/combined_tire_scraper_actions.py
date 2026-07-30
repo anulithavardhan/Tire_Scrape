@@ -27,6 +27,10 @@ GIGA_PAGE_TIMEOUT  = 90_000
 GIGA_WAIT_AFTER_MS = 5_000
 
 GIGA_SEEDS = [
+    {"model": "Maxtour LX",             "url": f"{GIGA_BASE_URL}/235-45-18/gt-radial-tires/maxtour-lx/tirecode/AS122"},
+    {"model": "Maxclimate",             "url": f"{GIGA_BASE_URL}/225-40-18/gt-radial-tires/maxclimate/tirecode/100UA4532"},
+    {"model": "Adventuro HT",           "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/adventuro-ht/tirecode/100UA3630"},
+    {"model": "Adventuro ATX",          "url": f"{GIGA_BASE_URL}/235-70-16/gt-radial-tires/adventuro-atx/tirecode/100UA3723"},
     {"model": "Champiro SX2",           "url": f"{GIGA_BASE_URL}/225-45-17/gt-radial-tires/champiro-sx2/tirecode/B611"},
     {"model": "Champiro HPY",           "url": f"{GIGA_BASE_URL}/255-35-18/gt-radial-tires/champiro-hpy/tirecode/B030"},
     {"model": "Maxmiler Pro",           "url": f"{GIGA_BASE_URL}/185-60-15/gt-radial-tires/maxmiler-pro/tirecode/B623"},
@@ -205,7 +209,10 @@ PRIORITY_HEADERS = {
 }
 
 PRIORITY_SEEDS = [
-    
+    {"model": "Maxtour LX",             "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/maxtour-lx/215-45r17-87v-7388"},
+    {"model": "Maxclimate",             "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/gt-radial-maxclimate/225-40r18-92v-xl-173817"},
+    {"model": "Adventuro HT",           "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-ht/235-85r16-120-116s-e-10-ply-14309"},
+    {"model": "Adventuro ATX",          "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/adventuro-atx/235-75r15-108s-xl-19048"},
     {"model": "Champiro SX2",           "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-sx2/235-45r17-94w-zr-11644"},
     {"model": "Champiro HPY",           "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-hpy/225-40r19-93y-xl-zr-63955"},
     {"model": "Champiro UHP A/S",       "url": f"{PRIORITY_BASE_URL}/by-brand/gt-radial-tires/champiro-uhp-a-s/215-55r17-94v-43619"},
@@ -302,7 +309,7 @@ async def priority_get_size_urls(page, seed):
     return deduped
 
 
-def priority_parse_next_data(html, fallback_size, url=None):
+def priority_parse_next_data(html, fallback_size, url=None, sku=None):
     result = {
         "price_per_tire": None, "total_4_tires": None,
         "rating": None, "review_count": None,
@@ -315,17 +322,21 @@ def priority_parse_next_data(html, fallback_size, url=None):
         nd     = json.loads(m.group(1))
         apollo = nd["props"]["pageProps"]["apolloState"]
 
-        target_id = None
-        if url:
+        # priority_get_size_urls() already discovered the actual Apollo
+        # SimpleProduct id/uid for this variant. Prefer it over the number at
+        # the end of the public URL, which is not always the Apollo product id.
+        target_id = str(sku) if sku is not None else None
+        if target_id is None and url:
             last_seg = url.rstrip("/").split("/")[-1]
             id_match = re.search(r"-(\d+)$", last_seg)
             if id_match:
-                target_id = int(id_match.group(1))
+                target_id = id_match.group(1)
 
         simple = None
         for key, val in apollo.items():
             if key.startswith("SimpleProduct:") and isinstance(val, dict) and "price_range" in val:
-                if target_id is None or val.get("id") == target_id:
+                product_id = val.get("id") or val.get("uid")
+                if target_id is None or str(product_id) == target_id:
                     simple = val
                     break
 
@@ -362,8 +373,9 @@ def priority_parse_next_data(html, fallback_size, url=None):
             if config.get("treadlife_warranty_text"):
                 result["warranty"] = config["treadlife_warranty_text"]
 
+        soup = BeautifulSoup(html, "lxml")
+
         if result["price_per_tire"] is None:
-            soup = BeautifulSoup(html, "lxml")
             el = soup.select_one(".ProductPagePrice-finalPrice span")
             if el:
                 try:
@@ -371,6 +383,13 @@ def priority_parse_next_data(html, fallback_size, url=None):
                     result["total_4_tires"]  = round(result["price_per_tire"] * 4, 2)
                 except ValueError:
                     pass
+
+        if result["in_stock"] is None:
+            page_text = " ".join(soup.stripped_strings)
+            if re.search(r"\bIn Stock\b", page_text, re.IGNORECASE):
+                result["in_stock"] = True
+            elif re.search(r"\bOut of Stock\b", page_text, re.IGNORECASE):
+                result["in_stock"] = False
     except Exception as e:
         result["parse_error"] = str(e)
     return result
@@ -392,7 +411,14 @@ async def priority_fetch_one(session, item, semaphore, run_date, index, total):
             try:
                 async with session.get(url, headers=PRIORITY_HEADERS, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                     if resp.status == 200:
-                        result.update(priority_parse_next_data(await resp.text(), size, url=url))
+                        result.update(
+                            priority_parse_next_data(
+                                await resp.text(),
+                                size,
+                                url=url,
+                                sku=item.get("sku"),
+                            )
+                        )
                         break
                     elif resp.status == 429:
                         await asyncio.sleep(5 * attempt)
