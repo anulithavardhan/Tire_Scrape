@@ -1,65 +1,46 @@
-name: Daily Tire Scraper
+name: Tire Price Scraper
 
 on:
-  schedule:
-    - cron: '30 9 * * 1-5'   # runs weekdays at 9:30 AM UTC / 5:30 AM Eastern during daylight savings
   workflow_dispatch:
+  schedule:
+    # Runs daily at 10:00 UTC (6:00 AM EDT / 5:00 AM EST).
+    - cron: "0 10 * * *"
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions:
+  contents: read
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4.2.2
+      - name: Check out repository
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5.6.0
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: "3.12"
+          cache: pip
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install playwright nest_asyncio pandas aiohttp beautifulsoup4 lxml brotli
-      
-      - name: Install Playwright browsers
-        run: playwright install chromium --with-deps
+      - name: Install Python packages
+        run: pip install -r requirements.txt
 
-      - name: Debug repo files
-        run: |
-          pwd
-          ls -la
-          echo "---- scraper folder ----"
-          ls -la scraper || true
+      - name: Install Chromium
+        run: playwright install --with-deps chromium
 
-      - name: Run scraper
-        run: |
-          python -u scraper/combined_tire_scraper_actions.py
+      - name: Scrape Giga and Priority
+        run: python scraper/combined_tire_scraper_actions.py
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Standardize and join MAP prices
+        run: python scraper/standardize_tire_prices.py
 
-      - name: Run SimpleTire scraper
-        continue-on-error: true
-        run: |
-          node scraper/simpletire-scrape.js --default-gt-radial --format csv > simpletire_raw.csv
-
-      - name: Standardize final CSV
-        run: |
-          python -u scraper/standardize_tire_prices.py
-
-      - name: Upload CSV artifact
+      - name: Upload standardized CSV
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tire-prices-${{ github.run_id }}
           path: tire_prices_*.csv
-          retention-days: 90
-          if-no-files-found: warn
+          if-no-files-found: error
+          retention-days: 30
