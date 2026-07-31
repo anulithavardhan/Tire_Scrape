@@ -395,7 +395,7 @@ def priority_parse_next_data(html, fallback_size, url=None, sku=None):
     return result
 
 
-async def priority_fetch_one(session, item, semaphore, run_date, index, total):
+async def priority_fetch_one(page, item, run_date, index, total):
     size, url = item["size"], item["url"]
     result = {
         "run_date": run_date, "source": "priority",
@@ -406,33 +406,64 @@ async def priority_fetch_one(session, item, semaphore, run_date, index, total):
         "rating": None, "review_count": None,
         "warranty": None, "url": url, "error": "",
     }
-    async with semaphore:
-        for attempt in range(1, PRIORITY_MAX_RETRY + 1):
-            try:
-                async with session.get(url, headers=PRIORITY_HEADERS, timeout=aiohttp.ClientTimeout(total=20)) as resp:
-                    if resp.status == 200:
-                        result.update(
-                            priority_parse_next_data(
-                                await resp.text(),
-                                size,
-                                url=url,
-                                sku=item.get("sku"),
-                            )
-                        )
-                        break
-                    elif resp.status == 429:
-                        await asyncio.sleep(5 * attempt)
-                    else:
-                        result["error"] = f"HTTP {resp.status}"
-                        break
-            except asyncio.TimeoutError:
-                if attempt < PRIORITY_MAX_RETRY:
-                    await asyncio.sleep(2 * attempt)
-                else:
-                    result["error"] = "Timeout"
-            except Exception as e:
-                result["error"] = str(e)
+
+    for attempt in range(1, PRIORITY_MAX_RETRY + 1):
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+            await page.wait_for_selector("script#__NEXT_DATA__", timeout=20_000)
+
+            # Priority fully hydrates price, stock, SKU and URL data only for
+            # the selected variant after browser navigation. Read that record
+            # before parsing the page.
+            selected_id = await page.evaluate("""() => {
+                const el = document.getElementById('__NEXT_DATA__');
+                if (!el) return null;
+                const nd = JSON.parse(el.textContent);
+                const apollo = nd?.props?.pageProps?.apolloState || {};
+                for (const [key, value] of Object.entries(apollo)) {
+                    if (key.startsWith('SimpleProduct:') &&
+                        value && typeof value === 'object' &&
+                        value.price_range) {
+                        return String(value.id || value.uid || '');
+                    }
+                }
+                return null;
+            }""")
+
+            expected_id = str(item.get("sku")) if item.get("sku") else None
+            result["url"] = page.url
+
+            # Some obsolete Priority variants redirect to another size. Do
+            # not save the redirected product under the requested size label.
+            if expected_id and selected_id and selected_id != expected_id:
+                result["in_stock"] = False
+                result["error"] = (
+                    f"Variant {expected_id} redirected to {selected_id}; skipped"
+                )
                 break
+
+            html = await page.content()
+            result.update(
+                priority_parse_next_data(
+                    html,
+                    size,
+                    url=page.url,
+                    sku=expected_id,
+                )
+            )
+
+            if result.get("price_per_tire") is None:
+                result["error"] = "Price not found after browser navigation"
+            break
+
+        except PlaywrightTimeout as e:
+            if attempt < PRIORITY_MAX_RETRY:
+                await asyncio.sleep(3 * attempt)
+            else:
+                result["error"] = f"Timeout after {PRIORITY_MAX_RETRY} retries: {e}"
+        except Exception as e:
+            result["error"] = f"Browser scrape error: {e}"
+            break
 
     price = f"${result.get('price_per_tire') or 'N/A'}"
     stock = "In Stock" if result.get("in_stock") else "OOS"
@@ -453,26 +484,29 @@ async def run_priority(run_date):
             args=["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"],
         )
         ctx  = await browser.new_context(user_agent=PRIORITY_HEADERS["User-Agent"])
-        page = await ctx.new_page()
-        await page.route("**attentive**", lambda r: r.abort())
-        await page.route("**attn.tv**",   lambda r: r.abort())
+        discovery_page = await ctx.new_page()
+        detail_page = await ctx.new_page()
+        await discovery_page.route("**attentive**", lambda r: r.abort())
+        await discovery_page.route("**attn.tv**",   lambda r: r.abort())
+        await detail_page.route("**attentive**", lambda r: r.abort())
+        await detail_page.route("**attn.tv**",   lambda r: r.abort())
 
         for seed in PRIORITY_SEEDS:
-            links = await priority_get_size_urls(page, seed)
+            links = await priority_get_size_urls(discovery_page, seed)
             all_size_links.extend(links)
 
+        total = len(all_size_links)
+        print(f"\n  Total Priority sizes: {total}\n")
+
+        results = []
+        for i, item in enumerate(all_size_links, 1):
+            result = await priority_fetch_one(
+                detail_page, item, run_date, i, total
+            )
+            results.append(result)
+            await asyncio.sleep(0.4)
+
         await browser.close()
-
-    total = len(all_size_links)
-    print(f"\n  Total Priority sizes: {total}\n")
-
-    semaphore = asyncio.Semaphore(PRIORITY_CONCURRENT)
-    async with aiohttp.ClientSession() as session:
-        tasks = [
-            priority_fetch_one(session, item, semaphore, run_date, i, total)
-            for i, item in enumerate(all_size_links, 1)
-        ]
-        results = await asyncio.gather(*tasks)
 
     print(f"\n  Priority: {len(results)} rows collected.")
     return list(results)
@@ -484,7 +518,7 @@ async def run_priority(run_date):
 async def main():
     run_date = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    giga_results     = await run_giga(run_date)
+    giga_results     = []
     priority_results = await run_priority(run_date)
 
     all_results = giga_results + priority_results
