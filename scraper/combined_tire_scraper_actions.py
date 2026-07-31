@@ -410,7 +410,13 @@ async def priority_fetch_one(page, item, run_date, index, total):
     for attempt in range(1, PRIORITY_MAX_RETRY + 1):
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-            await page.wait_for_selector("script#__NEXT_DATA__", timeout=20_000)
+            # Script tags are intentionally hidden. Wait for the JSON node to
+            # exist in the DOM instead of waiting for it to become visible.
+            await page.wait_for_selector(
+                "script#__NEXT_DATA__",
+                state="attached",
+                timeout=20_000,
+            )
 
             # Priority fully hydrates price, stock, SKU and URL data only for
             # the selected variant after browser navigation. Read that record
