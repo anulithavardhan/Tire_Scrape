@@ -1,10 +1,7 @@
-name: Tire Price Scraper
+name: SimpleTire Scraper
 
 on:
   workflow_dispatch:
-  schedule:
-    # Runs daily at 10:00 UTC (6:00 AM EDT / 5:00 AM EST).
-    - cron: "0 10 * * *"
 
 permissions:
   contents: read
@@ -12,35 +9,25 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-          cache: pip
+          node-version: "22"
 
-      - name: Install Python packages
-        run: pip install -r requirements.txt
+      - name: Run all SimpleTire products
+        run: node scraper/simpletire-scrape.js --default-gt-radial --format csv > simpletire_raw.csv
 
-      - name: Install Chromium
-        run: playwright install --with-deps chromium
-
-      - name: Scrape Giga and Priority
-        run: python scraper/combined_tire_scraper_actions.py
-
-      - name: Standardize and join MAP prices
-        run: python scraper/standardize_tire_prices.py
-
-      - name: Upload standardized CSV
+      - name: Upload SimpleTire CSV
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tire-prices-${{ github.run_id }}
-          path: tire_prices_*.csv
+          name: simpletire-results-${{ github.run_id }}
+          path: simpletire_raw.csv
           if-no-files-found: error
           retention-days: 30
