@@ -529,7 +529,7 @@ async def run_priority(run_date):
 async def main():
     run_date = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    giga_results     = []
+    giga_results     = await run_giga(run_date)
     priority_results = await run_priority(run_date)
 
     all_results = giga_results + priority_results
