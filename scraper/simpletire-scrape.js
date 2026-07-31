@@ -6,6 +6,15 @@ const DEFAULT_GT_RADIAL_URLS = [
   "https://simpletire.com/brands/gt-radial-tires/adventuro-ht",
   "https://simpletire.com/brands/gt-radial-tires/adventuro-atx",
   "https://simpletire.com/brands/gt-radial-tires/maxclimate",
+  "https://simpletire.com/brands/gt-radial-tires/champiro-sx2",
+  "https://simpletire.com/brands/gt-radial-tires/champiro-hpy",
+  "https://simpletire.com/brands/gt-radial-tires/maxmiler-pro",
+  "https://simpletire.com/brands/gt-radial-tires/champiro-uhp-a-s",
+  "https://simpletire.com/brands/gt-radial-tires/champiro-touring-a-s",
+  "https://simpletire.com/brands/gt-radial-tires/maxtour-all-season",
+  "https://simpletire.com/brands/gt-radial-tires/savero-ht2",
+  "https://simpletire.com/brands/gt-radial-tires/adventuro-at3",
+  "https://simpletire.com/brands/gt-radial-tires/komodo-mt-plus",
 ];
 
 const USAGE = `
@@ -290,8 +299,15 @@ async function main() {
   const groups = [];
 
   for (const url of urls) {
-    const rows = await scrapeUrl(url, htmlOverride);
-    groups.push({ sourceUrl: url, count: rows.length, rows });
+    try {
+      const rows = await scrapeUrl(url, htmlOverride);
+      groups.push({ sourceUrl: url, count: rows.length, rows, error: null });
+    } catch (error) {
+      // A valid SimpleTire model page can have zero currently available
+      // sizes. Report it, but do not discard results from every other model.
+      console.error(`Warning: ${error.message}`);
+      groups.push({ sourceUrl: url, count: 0, rows: [], error: error.message });
+    }
   }
 
   const rows = groups.flatMap((group) => group.rows);
@@ -303,7 +319,7 @@ async function main() {
       sourceUrls: urls,
       scrapedAt: new Date().toISOString(),
       count: rows.length,
-      products: groups.map(({ sourceUrl, count }) => ({ sourceUrl, count })),
+      products: groups.map(({ sourceUrl, count, error }) => ({ sourceUrl, count, error })),
       rows,
     }, null, 2));
   }
