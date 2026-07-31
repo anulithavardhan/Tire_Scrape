@@ -198,7 +198,7 @@ async def run_giga(run_date):
 # ─────────────────────────────────────────────────────────────────────────────
 PRIORITY_BASE_URL   = "https://www.prioritytire.com"
 PRIORITY_CONCURRENT = 10
-PRIORITY_MAX_RETRY  = 3
+PRIORITY_MAX_RETRY  = 2
 
 PRIORITY_HEADERS = {
     "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -397,6 +397,11 @@ def priority_parse_next_data(html, fallback_size, url=None, sku=None):
 
 async def priority_fetch_one(page, item, run_date, index, total):
     size, url = item["size"], item["url"]
+    print(
+        f"  Loading [{index:03}/{total}] {item.get('model'):22s}  "
+        f"{str(size):28s}",
+        flush=True,
+    )
     result = {
         "run_date": run_date, "source": "priority",
         "model": item.get("model"), "size": size,
@@ -409,13 +414,13 @@ async def priority_fetch_one(page, item, run_date, index, total):
 
     for attempt in range(1, PRIORITY_MAX_RETRY + 1):
         try:
-            await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+            await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
             # Script tags are intentionally hidden. Wait for the JSON node to
             # exist in the DOM instead of waiting for it to become visible.
             await page.wait_for_selector(
                 "script#__NEXT_DATA__",
                 state="attached",
-                timeout=20_000,
+                timeout=10_000,
             )
 
             # Priority fully hydrates price, stock, SKU and URL data only for
@@ -524,7 +529,7 @@ async def run_priority(run_date):
 async def main():
     run_date = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    giga_results     = []
+    giga_results     = await run_giga(run_date)
     priority_results = await run_priority(run_date)
 
     all_results = giga_results + priority_results
