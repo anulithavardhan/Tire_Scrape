@@ -78,18 +78,50 @@ def normalize_model(value):
     return replacements.get(key, text)
 
 
-def raw_size_from_size(size):
+def raw_size_from_size(size, website=None):
     if pd.isna(size):
         return None
+
     text = str(size).upper().strip()
-    match = re.search(
-        r"(LT|P)?\d{3}/\d{2}R\d{2}|\d{2,3}X\d{1,2}\.\d{2}R\d{2}",
+
+    # Handles:
+    # 195/50ZR15  -> 195/50R15
+    # 245/75R16   -> 245/75R16
+    # LT245/75R16 -> LT245/75R16
+    metric_match = re.search(
+        r"\b(LT|P)?(\d{3}/\d{2})(?:Z?R)(\d{2})\b",
         text,
     )
-    if not match:
-        return None
-    raw_size = match.group(0)
-    return raw_size[1:] if raw_size.startswith("P") else raw_size
+
+    if metric_match:
+        prefix = metric_match.group(1) or ""
+        raw_size = f"{prefix}{metric_match.group(2)}R{metric_match.group(3)}"
+
+        # P-prefix is not retained in RAW SIZE
+        if raw_size.startswith("P"):
+            raw_size = raw_size[1:]
+
+        # Priority identifies LT tires using a dual load index:
+        # 245/75R16 120/116S E (10 Ply)
+        if str(website).strip().lower() == "priority":
+            remaining_text = text[metric_match.end():]
+
+            if re.search(r"\b\d{3}/\d{3}[A-Z]\b", remaining_text):
+                if not raw_size.startswith("LT"):
+                    raw_size = f"LT{raw_size}"
+
+        return raw_size
+
+    # Flotation sizes such as 35X12.50R20
+    flotation_match = re.search(
+        r"\b\d{2,3}X\d{1,2}\.\d{2}R\d{2}\b",
+        text,
+    )
+
+    if flotation_match:
+        return flotation_match.group(0)
+
+    return None
 
 
 def standardize_existing_giga_priority(df):
@@ -143,7 +175,10 @@ def main():
         print("No simpletire_raw.csv found. Keeping only Giga/Priority rows.")
 
     final_df = pd.concat(all_frames, ignore_index=True)
-    final_df["RAW SIZE"] = final_df["size"].apply(raw_size_from_size)
+    final_df["RAW SIZE"] = final_df.apply(
+    lambda row: raw_size_from_size(row["size"], row["website"]),
+    axis=1,
+)
     final_df["DATE"] = TODAY
 
     map_df = pd.read_csv("scraper/map_prices.csv")
