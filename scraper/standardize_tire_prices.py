@@ -88,14 +88,22 @@ def raw_size_from_size(size, website=None):
     # 195/50ZR15  -> 195/50R15
     # 245/75R16   -> 245/75R16
     # LT245/75R16 -> LT245/75R16
+    # 185/60R15C  -> 185/60R15C
     metric_match = re.search(
-        r"\b(LT|P)?(\d{3}/\d{2})(?:Z?R)(\d{2})\b",
+        r"\b(LT|P)?(\d{3}/\d{2})(?:Z?R)(\d{2})(C)?\b",
         text,
     )
 
     if metric_match:
         prefix = metric_match.group(1) or ""
-        raw_size = f"{prefix}{metric_match.group(2)}R{metric_match.group(3)}"
+        commercial_suffix = metric_match.group(4) or ""
+
+        raw_size = (
+            f"{prefix}"
+            f"{metric_match.group(2)}"
+            f"R{metric_match.group(3)}"
+            f"{commercial_suffix}"
+        )
 
         # P-prefix is not retained in RAW SIZE
         if raw_size.startswith("P"):
@@ -112,14 +120,20 @@ def raw_size_from_size(size, website=None):
 
         return raw_size
 
-    # Flotation sizes such as 35X12.50R20
+    # Flotation sizes such as:
+    # 31X10.50R15LT
+    # 33X12.50R15LT
+    # 35X12.50R20
     flotation_match = re.search(
-        r"\b\d{2,3}X\d{1,2}\.\d{2}R\d{2}\b",
+        r"\b(\d{2,3}X\d{1,2}\.\d{2}R\d{2})(LT)?\b",
         text,
     )
 
     if flotation_match:
-        return flotation_match.group(0)
+        flotation_size = flotation_match.group(1)
+        lt_suffix = flotation_match.group(2) or ""
+
+        return f"{flotation_size}{lt_suffix}"
 
     return None
 
@@ -176,9 +190,9 @@ def main():
 
     final_df = pd.concat(all_frames, ignore_index=True)
     final_df["RAW SIZE"] = final_df.apply(
-    lambda row: raw_size_from_size(row["size"], row["website"]),
-    axis=1,
-)
+        lambda row: raw_size_from_size(row["size"], row["website"]),
+        axis=1,
+    )
     final_df["DATE"] = TODAY
 
     map_df = pd.read_csv("scraper/map_prices.csv")
