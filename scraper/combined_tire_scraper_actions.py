@@ -153,6 +153,19 @@ GIGA_SEEDS = [
 ]
 
 
+def giga_mfg_from_url(url):
+    if not url:
+        return None
+
+    match = re.search(
+        r"/tirecode/([^/?#]+)",
+        url,
+        re.IGNORECASE,
+    )
+
+    return match.group(1) if match else None
+
+
 def giga_empty(
     run_date,
     model,
@@ -169,7 +182,7 @@ def giga_empty(
         "original_price": None,
         "easy_score": None,
         "reviews": None,
-        "sku": None,
+        "sku": giga_mfg_from_url(url),
         "rating": None,
         "review_count": None,
         "in_stock": in_stock,
@@ -407,6 +420,37 @@ async def giga_scrape_page(
                     reviews: txt(
                         '#product_just_stars .ind_cnt a'
                     ),
+
+                    mfg: (() => {
+                        const specs =
+                            document.querySelectorAll(
+                                '.product-description__spec'
+                            );
+
+                        for (const spec of specs) {
+                            const label =
+                                spec.querySelector(
+                                    '.h5-element'
+                                );
+
+                            const value =
+                                spec.querySelector(
+                                    '.p-regular-md'
+                                );
+
+                            if (
+                                label &&
+                                value &&
+                                label.innerText
+                                    .trim()
+                                    .toUpperCase() === 'MFG'
+                            ) {
+                                return value.innerText.trim();
+                            }
+                        }
+
+                        return null;
+                    })(),
                 };
             }"""
         )
@@ -446,6 +490,9 @@ async def giga_scrape_page(
             )
 
         result["reviews"] = data.get("reviews")
+
+        if data.get("mfg"):
+            result["sku"] = data["mfg"].strip()
 
         if not result["price_per_tire"]:
             result["error"] = "Price not found"
