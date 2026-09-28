@@ -48,6 +48,7 @@ COLUMN_ORDER = [
     "original_price",
     "easy_score",
     "reviews",
+    "part_number",
     "sku",
     "rating",
     "review_count",
@@ -174,6 +175,7 @@ def giga_empty(
     url,
     error,
 ):
+    part_number = giga_mfg_from_url(url)
     return {
         "run_date": run_date,
         "source": "giga",
@@ -182,7 +184,9 @@ def giga_empty(
         "original_price": None,
         "easy_score": None,
         "reviews": None,
-        "sku": giga_mfg_from_url(url),
+        # Giga labels its manufacturer part number as "MFG".
+        "part_number": part_number,
+        "sku": part_number,
         "rating": None,
         "review_count": None,
         "in_stock": in_stock,
@@ -492,7 +496,9 @@ async def giga_scrape_page(
         result["reviews"] = data.get("reviews")
 
         if data.get("mfg"):
-            result["sku"] = data["mfg"].strip()
+            part_number = data["mfg"].strip()
+            result["part_number"] = part_number
+            result["sku"] = part_number
 
         if not result["price_per_tire"]:
             result["error"] = "Price not found"
@@ -1166,6 +1172,7 @@ def priority_parse_next_data(
     sku=None,
 ):
     result = {
+        "part_number": None,
         "price_per_tire": None,
         "total_4_tires": None,
         "rating": None,
@@ -1278,6 +1285,13 @@ def priority_parse_next_data(
         )
 
         if simple:
+            # Priority displays this identifier as "MPN". Apollo field names
+            # can vary, so try the known variants before using the page text.
+            result["part_number"] = (
+                simple.get("mpn")
+                or simple.get("manufacturer_part_number")
+                or simple.get("manufacturerPartNumber")
+            )
             try:
                 price_range = (
                     simple["price_range"]
@@ -1467,6 +1481,23 @@ def priority_parse_next_data(
             "lxml",
         )
 
+        if not result["part_number"]:
+            mpn_label = soup.find(
+                lambda tag: tag.name in {"span", "p", "div"}
+                and tag.get_text(" ", strip=True).upper() == "MPN"
+            )
+            if mpn_label:
+                # The value is normally the next element in the same details
+                # row; fall back to the parent's remaining text.
+                value_element = mpn_label.find_next_sibling()
+                if value_element:
+                    value = value_element.get_text(" ", strip=True)
+                else:
+                    parent_text = mpn_label.parent.get_text(" ", strip=True)
+                    value = re.sub(r"^MPN\s*[:#-]?\s*", "", parent_text, flags=re.I)
+                if value and value.upper() != "MPN":
+                    result["part_number"] = value.strip()
+
         if (
             result[
                 "price_per_tire"
@@ -1568,6 +1599,7 @@ async def priority_fetch_one(
         "original_price": None,
         "easy_score": None,
         "reviews": None,
+        "part_number": None,
         "sku": item.get("sku"),
         "rating": None,
         "review_count": None,
@@ -1942,6 +1974,7 @@ async def run_priority(
                     "original_price": None,
                     "easy_score": None,
                     "reviews": None,
+                    "part_number": None,
                     "sku": item.get(
                         "sku"
                     ),
