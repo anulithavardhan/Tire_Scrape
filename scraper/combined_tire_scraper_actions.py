@@ -19,6 +19,7 @@ Designed for GitHub Actions.
 import asyncio
 import datetime
 import json
+import random
 import re
 import sys
 from urllib.parse import urljoin
@@ -148,6 +149,14 @@ GIGA_SEEDS = [
         "url": f"{GIGA_BASE_URL}/235-75-15/gt-radial-tires/savero-komodo-m-t-plus/tirecode/A289",
     },
 ]
+
+# Slow, polite pacing helps avoid overwhelming Giga and reduces ordinary
+# rate-limiting. It cannot guarantee that Cloudflare will accept a hosted
+# runner's IP address.
+GIGA_PRODUCT_DELAY_MIN = 12
+GIGA_PRODUCT_DELAY_MAX = 20
+GIGA_MODEL_DELAY_MIN = 25
+GIGA_MODEL_DELAY_MAX = 40
 
 
 def giga_mfg_from_url(url):
@@ -702,7 +711,12 @@ async def run_giga(run_date):
 
                 # Give Giga a break before trying the next model, including
                 # after a failed seed page.
-                await asyncio.sleep(5)
+                delay = random.uniform(
+                    GIGA_MODEL_DELAY_MIN,
+                    GIGA_MODEL_DELAY_MAX,
+                )
+                print(f"  Waiting {delay:.1f}s before the next model...")
+                await asyncio.sleep(delay)
 
                 continue
 
@@ -817,10 +831,15 @@ async def run_giga(run_date):
                     giga_blocked = True
                     break
 
-                # Giga begins throttling when product pages are opened too
-                # quickly. A short delay also gives client-side price data
-                # time to settle between navigations.
-                await asyncio.sleep(2.5)
+                # Pace product requests conservatively. The small amount of
+                # jitter prevents every navigation from landing at exactly
+                # the same interval while keeping the request rate low.
+                delay = random.uniform(
+                    GIGA_PRODUCT_DELAY_MIN,
+                    GIGA_PRODUCT_DELAY_MAX,
+                )
+                print(f"             Waiting {delay:.1f}s...")
+                await asyncio.sleep(delay)
 
             # --------------------------------------------------------------
             # CHECKPOINT AFTER EVERY MODEL
@@ -839,7 +858,12 @@ async def run_giga(run_date):
                 break
 
             # Longer pause between tire models.
-            await asyncio.sleep(5)
+            delay = random.uniform(
+                GIGA_MODEL_DELAY_MIN,
+                GIGA_MODEL_DELAY_MAX,
+            )
+            print(f"  Waiting {delay:.1f}s before the next model...")
+            await asyncio.sleep(delay)
 
         await browser.close()
 
