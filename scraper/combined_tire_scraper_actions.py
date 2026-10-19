@@ -23,7 +23,6 @@ import re
 import sys
 from urllib.parse import urljoin
 
-import nest_asyncio
 import pandas as pd
 from bs4 import BeautifulSoup
 from playwright.async_api import (
@@ -31,9 +30,6 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeout,
 )
 from playwright_stealth import Stealth
-
-
-nest_asyncio.apply()
 
 
 # =============================================================================
@@ -216,6 +212,16 @@ async def giga_load_seed(page, url):
                 timeout=GIGA_PAGE_TIMEOUT,
             )
 
+            title = (await page.title()).lower()
+            if (
+                "just a moment" in title
+                or "access denied" in title
+            ):
+                return False, (
+                    "Giga/Cloudflare blocked the seed page; "
+                    "stopping this Giga session"
+                )
+
             # Giga keeps its size selector hidden until the user opens it.
             # Wait for a variant link to exist in the DOM; do not require
             # the surrounding button or dropdown to be visible.
@@ -273,8 +279,11 @@ async def giga_load_product(page, url):
                 "just a moment" in title.lower()
                 or "access denied" in title.lower()
             ):
-                raise PlaywrightTimeout(
-                    f"Giga/Cloudflare throttle page: {title}"
+                # Do not retry this URL or continue through the remaining
+                # products. Repeated requests make a Cloudflare block last
+                # longer; run_giga uses this message as a circuit breaker.
+                return False, (
+                    f"Giga/Cloudflare blocked this session: {title}"
                 )
 
             # The price element is inserted before its text is populated.
@@ -290,7 +299,7 @@ async def giga_load_product(page, url):
                     const value = el?.textContent?.trim() || '';
                     return /\\$\\s*[0-9]/.test(value);
                 }""",
-                price_selector,
+                arg=price_selector,
                 timeout=GIGA_PRICE_TIMEOUT,
             )
 
@@ -359,6 +368,11 @@ async def giga_get_size_links(
                         } catch (_) {
                             return;
                         }
+
+                        // #reviews and tracking query strings can make the
+                        // same SKU look like multiple URLs.
+                        target.hash = '';
+                        target.search = '';
 
                         const parts = target.pathname
                             .split('/')
@@ -642,6 +656,8 @@ async def run_giga(run_date):
         stealth = Stealth()
         await stealth.apply_stealth_async(page)
 
+        giga_blocked = False
+
         for seed in GIGA_SEEDS:
 
             model_name = seed["model"]
@@ -675,6 +691,14 @@ async def run_giga(run_date):
                     results,
                     "giga_checkpoint.csv",
                 )
+
+                if "cloudflare" in (seed_err or "").lower():
+                    print(
+                        "\n  ⛔ Cloudflare blocked the Giga seed page. "
+                        "Checkpoint saved; stopping Giga for this run."
+                    )
+                    giga_blocked = True
+                    break
 
                 # Give Giga a break before trying the next model, including
                 # after a failed seed page.
@@ -780,10 +804,23 @@ async def run_giga(run_date):
                     f"{err}"
                 )
 
+                error_text = str(
+                    data.get("error") or ""
+                ).lower()
+
+                if "cloudflare" in error_text:
+                    print(
+                        "\n  ⛔ Cloudflare blocked this Giga session. "
+                        "Stopping immediately instead of retrying every "
+                        "remaining tire."
+                    )
+                    giga_blocked = True
+                    break
+
                 # Giga begins throttling when product pages are opened too
                 # quickly. A short delay also gives client-side price data
                 # time to settle between navigations.
-                await asyncio.sleep(1.25)
+                await asyncio.sleep(2.5)
 
             # --------------------------------------------------------------
             # CHECKPOINT AFTER EVERY MODEL
@@ -797,6 +834,9 @@ async def run_giga(run_date):
                 f"  💾 Giga checkpoint saved "
                 f"({len(results)} rows total)"
             )
+
+            if giga_blocked:
+                break
 
             # Longer pause between tire models.
             await asyncio.sleep(5)
