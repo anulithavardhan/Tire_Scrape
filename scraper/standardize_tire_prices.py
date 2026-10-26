@@ -72,6 +72,10 @@ def normalize_model(value):
         "gt radial komodo mt plus": "Savero Komodo M/T Plus",
         "komodo m/t plus": "Savero Komodo M/T Plus",
         "komodo mt plus": "Savero Komodo M/T Plus",
+        "gt radial adventuro atz": "Adventuro ATZ",
+        "adventuro atz": "Adventuro ATZ",
+        "gt radial adventuro rt": "Adventuro RT",
+        "adventuro rt": "Adventuro RT",
     }
 
     key = re.sub(r"\s+", " ", text.lower().replace("-", " ")).strip()
