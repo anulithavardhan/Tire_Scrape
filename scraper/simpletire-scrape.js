@@ -15,6 +15,8 @@ const DEFAULT_GT_RADIAL_URLS = [
   "https://simpletire.com/brands/gt-radial-tires/savero-ht2",
   "https://simpletire.com/brands/gt-radial-tires/adventuro-at3",
   "https://simpletire.com/brands/gt-radial-tires/komodo-mt-plus",
+  "https://simpletire.com/brands/gt-radial-tires/adventuro-atz",
+  "https://simpletire.com/brands/gt-radial-tires/adventuro-rt",
 ];
 
 const USAGE = `
