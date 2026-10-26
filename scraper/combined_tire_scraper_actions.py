@@ -1034,7 +1034,7 @@ PRIORITY_SEEDS = [
         ),
     },
      {
-        "model": "Adventuro ATZ",
+        "model": "Adventuro RT",
         "url": (
             f"{PRIORITY_BASE_URL}"
             "/by-brand/gt-radial-tires/"
