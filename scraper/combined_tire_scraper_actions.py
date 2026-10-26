@@ -1024,6 +1024,24 @@ PRIORITY_SEEDS = [
             "235-75r15-104-101q-c-6-ply-53015"
         ),
     },
+     {
+        "model": "Adventuro ATZ",
+        "url": (
+            f"{PRIORITY_BASE_URL}"
+            "/by-brand/gt-radial-tires/"
+            "adventuro-atz/"
+            "235-75r15-109t-xl-377637"
+        ),
+    },
+     {
+        "model": "Adventuro ATZ",
+        "url": (
+            f"{PRIORITY_BASE_URL}"
+            "/by-brand/gt-radial-tires/"
+            "gt-radial-adventuro-rt/"
+            "245-75r16-120-116s-e-10-ply-377649"
+        ),
+    },
 ]
 
 
